@@ -1,7 +1,881 @@
-<script src="https://www.gstatic.com/dialogflow-console/fast/messenger/bootstrap.js?v=1"></script>
-<df-messenger
-  chat-icon="https:&#x2F;&#x2F;i.imgur.com&#x2F;l1Na2Ac.jpeg"
-  chat-title="나눗셈-AI-교사"
-  agent-id="3dd5863d-f85f-4a1c-875c-93ac621400cb"
-  language-code="ko"
-></df-messenger>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>나눗셈 챗봇</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .chat-container {
+            max-width: 800px;
+            height: 80vh;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #e2e8e0;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-color: white;
+        }
+        .messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .message {
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 1.5rem;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .bot-message {
+            background-color: #e0e7ff;
+            align-self: flex-start;
+            border-bottom-left-radius: 0.25rem;
+        }
+        .user-message {
+            background-color: #d1fae5;
+            align-self: flex-end;
+            border-bottom-right-radius: 0.25rem;
+        }
+        .input-area {
+            display: flex;
+            padding: 1rem;
+            border-top: 1px solid #e2e8e0;
+            gap: 0.5rem;
+        }
+        input, button {
+            border-radius: 0.75rem;
+        }
+        input {
+            flex-grow: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid #cbd5e1;
+        }
+        button {
+            padding: 0.75rem 1.5rem;
+            background-color: #4f46e5;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #4338ca;
+        }
+        .stage-select {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            border-top: 1px solid #e2e8e0;
+            justify-content: center;
+        }
+        .stage-button {
+            padding: 0.75rem 1rem;
+            background-color: #6ee7b7;
+            border-radius: 0.75rem;
+            transition: background-color 0.2s;
+        }
+        .stage-button:hover {
+            background-color: #34d399;
+        }
+        .text-input {
+            width: 100%;
+        }
+        .header {
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .header-user-id {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        .number-input-container {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .number-input-container input {
+            width: 50px;
+            text-align: center;
+        }
+        .start-button-container {
+            padding: 1rem;
+            display: flex;
+            justify-content: center;
+            border-top: 1px solid #e2e8e0;
+        }
+        .number-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .number-pad button {
+            padding: 20px;
+            font-size: 1.5em;
+            background-color: #e2e8e0;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .number-pad button:hover {
+            background-color: #cbd5e1;
+        }
+        .llm-hint-button {
+            background-color: #fcd34d;
+            color: #92400e;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            margin-top: 0.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        .llm-hint-button:hover {
+            background-color: #fbbf24;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(10px); }
+        }
+        .fade-out {
+            animation: fadeOut 0.5s forwards;
+        }
+    </style>
+</head>
+<body>
+    <div class="p-4 md:p-8 flex flex-col items-center min-h-screen">
+        <div class="chat-container">
+            <div class="header">
+                <span class="header-title">나눗셈 챗봇</span>
+                <span id="userIdDisplay" class="header-user-id">사용자 ID: 로딩 중...</span>
+            </div>
+            <div id="messages" class="messages">
+                <!-- Chat messages will be dynamically added here -->
+            </div>
+            <div id="input-container" class="input-area">
+                <input type="text" id="userInput" placeholder="답변을 입력하세요..." class="text-input" disabled>
+                <button id="sendBtn" disabled>보내기</button>
+            </div>
+            <div id="start-button-container" class="start-button-container hidden">
+                <button id="startButton" class="stage-button">새 문제 시작하기</button>
+            </div>
+            <div id="number-input-start" class="input-area hidden">
+                <div class="flex flex-col gap-2 w-full">
+                    <p class="text-gray-600 font-semibold text-center">나눗셈 문제를 입력해주세요. (예: 67 / 7)</p>
+                    <div class="flex gap-2 justify-center items-center">
+                        <input type="number" id="dividendInput" placeholder="나누어질 수" class="w-28 p-2 border rounded-md">
+                        <span class="text-xl font-bold">/</span>
+                        <input type="number" id="divisorInput" placeholder="나누는 수" class="w-28 p-2 border rounded-md">
+                    </div>
+                    <button id="problemStartBtn" class="stage-button mt-4">문제 시작</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase 모듈 임포트
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase 로깅 레벨 설정
+        setLogLevel('debug');
+
+        // 전역 변수 (캔버스 환경에서 제공되는 변수 사용)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let app, db, auth;
+        let userId = null;
+        let currentProblem = null;
+        let step = 0;
+        let isLlmGenerating = false; // LLM 요청 중복 방지 플래그
+
+        const messagesContainer = document.getElementById('messages');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const startButton = document.getElementById('startButton');
+        const startButtonContainer = document.getElementById('start-button-container');
+        const numberInputStart = document.getElementById('number-input-start');
+        const problemStartBtn = document.getElementById('problemStartBtn');
+        const dividendInput = document.getElementById('dividendInput');
+        const divisorInput = document.getElementById('divisorInput');
+        const inputContainer = document.getElementById('input-container');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+
+        // ==== Gemini API 호출 함수 시작 ====
+        const apiKey = ""; 
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        // 지수 백오프를 사용한 Fetch 함수
+        async function fetchWithExponentialBackoff(payload, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 429) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue; 
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    return await response.json();
+
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        console.error("Gemini API 호출 최대 재시도 횟수 초과:", error);
+                        throw error;
+                    }
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+        
+        // 1. 구체적인 힌트 생성 (✨ 나눔봇 팁)
+        async function generateHint(currentProblem, currentStep) {
+            if (isLlmGenerating) return;
+            isLlmGenerating = true;
+
+            const problem = `${currentProblem.dividend} ÷ ${currentProblem.divisor}`;
+            const question = currentProblem.steps[step - 1].text; 
+            // 현재 단계의 예상 정답 추출 (expectedNumber, expectedTens 등)
+            const expectedAnswer = currentStep.expectedNumber || currentStep.expectedTens || currentStep.expectedHundreds || currentStep.expectedModels.join(', ');
+            
+            // 시스템 프롬프트: 튜터의 역할과 톤 정의
+            const systemPrompt = `당신은 초등학생에게 나눗셈을 가르치는 친절하고 격려하는 수학 튜터(나눔봇)입니다. 학생이 틀린 문제의 단계를 보고, 정답을 직접 알려주지 않고, 다음 질문에 대한 답을 찾는 데 도움이 될 수 있는 구체적인 힌트를 한 문장으로 제공하세요. 힌트는 수 모형(백모형, 십모형, 일모형)의 개념을 사용하여 설명해야 합니다. 답변은 반드시 한국어로 작성하세요.`;
+
+            // 사용자 쿼리: LLM에게 요청하는 구체적인 작업
+            const userQuery = `현재 문제: ${problem}. 바로 이전 챗봇의 질문: "${question}". 이 질문의 정답은 ${expectedAnswer}입니다. 학생이 정답을 맞히지 못했으므로, 이 정답을 유추할 수 있는 1개의 구체적인 힌트 문장을 생성해 주세요.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            addBotMessage('<div id="llm-hint-loading" class="text-sm text-gray-500 italic">✨ 나눔봇 팁을 생각 중...</div>');
+            const loadingElement = document.getElementById('llm-hint-loading');
+
+            try {
+                const result = await fetchWithExponentialBackoff(payload);
+                const hintText = result.candidates?.[0]?.content?.parts?.[0]?.text || "잠시 오류가 발생했어요. 다시 시도해 볼까요?";
+                
+                if (loadingElement) {
+                     // 힌트 메시지 스타일을 사용자 메시지처럼 변경하여 돋보이게 합니다.
+                     loadingElement.parentElement.classList.remove('bot-message');
+                     loadingElement.parentElement.classList.add('user-message', 'bg-yellow-100', 'text-gray-800');
+                     loadingElement.innerHTML = `✨ **나눔봇 팁:** ${hintText}`;
+                     scrollToBottom();
+                } else {
+                    addBotMessage(`✨ **나눔봇 팁:** ${hintText}`);
+                }
+
+            } catch (error) {
+                console.error("힌트 생성 실패:", error);
+                if (loadingElement) {
+                    loadingElement.textContent = "힌트 생성에 실패했어요. 하지만 괜찮아요! 다시 시도해봐요!";
+                } else {
+                    addBotMessage("힌트 생성에 실패했어요. 하지만 괜찮아요! 다시 시도해봐요!");
+                }
+            } finally {
+                isLlmGenerating = false;
+            }
+        }
+
+        // 2. 최종 피드백 생성 (✨ 나눔봇 코멘트)
+        async function generateFinalComment(dividend, divisor, quotient, remainder) {
+            
+            const problem = `${dividend} ÷ ${divisor}`;
+            
+            const systemPrompt = `당신은 초등학생에게 나눗셈을 가르치는 친절하고 유머러스한 수학 튜터(나눔봇)입니다. 학생이 푼 나눗셈 문제의 결과와 특징을 바탕으로, 칭찬과 격려를 담은 1~2문장의 최종 피드백을 한국어로 생성해주세요.`;
+
+            const userQuery = `학생이 나눗셈 문제 ${problem}를 풀었습니다. 몫은 ${quotient}이고 나머지는 ${remainder}입니다. 이 결과를 바탕으로 학생의 노력에 대해 칭찬하고 격려하는 최종 코멘트를 작성해 주세요. (예시: 나머지가 0이니 깔끔하게 성공했네요!)`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            // 완료 메시지 직후에 LLM 호출
+            try {
+                const result = await fetchWithExponentialBackoff(payload);
+                const commentText = result.candidates?.[0]?.content?.parts?.[0]?.text || "수고했어요! 정말 멋진 학습 태도예요!";
+                addBotMessage(`<div class="text-lg font-bold text-indigo-700">🎉 ✨ 나눔봇 코멘트:</div><div class="text-base">${commentText}</div>`);
+            } catch (error) {
+                console.error("최종 코멘트 생성 실패:", error);
+                addBotMessage(`수고했어요! 정말 멋진 학습 태도예요!`);
+            }
+        }
+        // ==== Gemini API 호출 함수 끝 ====
+
+
+        // 주어진 나눗셈 문제에 대한 대화 시나리오 생성 (엄격한 로직 유지)
+        function createScenario(dividend, divisor) {
+            const scenario = [];
+            const isThreeDigit = dividend >= 100;
+
+            if (isThreeDigit) {
+                const hundreds = Math.floor(dividend / 100);
+                const tens = Math.floor((dividend % 100) / 10);
+                const ones = dividend % 10;
+                
+                // 백모형, 십모형, 일모형 개수 묻기
+                scenario.push({ type: 'bot', text: `안녕! 나는 나눗셈을 도와주는 나눔봇이야. 함께 ${dividend} ÷ ${divisor}를 계산해볼까? 먼저 ${dividend}을 수 모형으로 나타내면, 백모형, 십모형, 일모형이 각각 몇 개씩 필요할까?` });
+                scenario.push({
+                    type: 'user',
+                    correctType: 'blockCount',
+                    expectedHundreds: hundreds,
+                    expectedTens: tens,
+                    expectedOnes: ones
+                });
+                
+                let quotientHundreds = 0; 
+                let remainderHundreds = 0;
+                let totalTens = 0;
+
+                // 백모형 나누기
+                if (hundreds >= divisor) {
+                    quotientHundreds = Math.floor(hundreds / divisor); 
+                    remainderHundreds = hundreds % divisor;
+
+                    scenario.push({ type: 'bot', text: `좋아. 그럼 백모형 ${hundreds}개를 ${divisor}명에게 똑같이 나누어 주면 한 명당 몇 개씩 가질 수 있을까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientHundreds });
+                    
+                    // 나누어 준 총 백모형 개수 묻는 단계
+                    scenario.push({ type: 'bot', text: `딩동댕! 그럼 ${divisor}명에게 백모형을 ${quotientHundreds}개씩 나누어주면, 우리가 사용한 백모형은 모두 몇 개일까? ( ${divisor}명 x ${quotientHundreds}개 )` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientHundreds * divisor });
+
+                    scenario.push({ type: 'bot', text: `맞아! 그럼 남는 백모형은 몇 개일까?` });
+                    scenario.push({ type: 'user', correctType: 'numberOrText', expectedNumber: remainderHundreds, correctText: ['없어요', '0개'] });
+
+                    totalTens = remainderHundreds * 10 + tens;
+                    
+                    // --- 백모형이 남는 경우, 십모형으로 변환 및 합산 과정 ---
+                    if (remainderHundreds > 0) {
+                        const convertedTens = remainderHundreds * 10;
+                        
+                        // 1. 남은 백모형을 십모형으로 바꾸는 질문
+                        scenario.push({ type: 'bot', text: `맞아! 남은 백모형 ${remainderHundreds}개는 ${divisor}명에게 똑같이 나누어 줄 수 없으니, 십모형으로 바꾸어주자. 백모형 1개는 십모형 10개와 같으니, 백모형 ${remainderHundreds}개는 십모형 몇 개와 같을까?` });
+                        scenario.push({ type: 'user', correctType: 'number', expectedNumber: convertedTens });
+    
+                        // 2. 새로 바꾼 십모형과 원래 십모형을 합치는 질문
+                        scenario.push({ type: 'bot', text: `최고야! 그럼 새로 바꾼 십모형 ${convertedTens}개와 원래 있던 십모형 ${tens}개를 합치면, 십모형은 모두 몇 개가 될까?` });
+                        scenario.push({ type: 'user', correctType: 'number', expectedNumber: totalTens });
+                    }
+                    // --- 백모형 과정 끝 ---
+
+                } else { // 백모형이 나누는 수보다 작은 경우 (예: 100 ÷ 5)
+                    scenario.push({ type: 'bot', text: `백모형 ${hundreds}개는 ${divisor}명에게 똑같이 나누어 줄 수 없으니, 십모형으로 바꿔주자. 백모형 ${hundreds}개는 십모형 몇 개와 같을까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: hundreds * 10 });
+
+                    scenario.push({ type: 'bot', text: `아주 잘했어! 그럼 새로 바꾼 십모형 ${hundreds * 10}개와 원래 있던 십모형 ${tens}개를 합치면, 십모형은 모두 몇 개가 될까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: hundreds * 10 + tens });
+
+                    totalTens = hundreds * 10 + tens;
+                }
+                
+                const quotientTens = Math.floor(totalTens / divisor);
+                const remainderTens = totalTens % divisor;
+
+                // 십모형 나누기
+                if (totalTens > 0) {
+                    scenario.push({ type: 'bot', text: `아주 잘했어! 그럼 십모형 ${totalTens}개를 ${divisor}명에게 똑같이 나누어 주면 한 명당 몇 개씩 가질 수 있을까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientTens });
+
+                    scenario.push({ type: 'bot', text: `딩동댕! 그럼 ${divisor}명에게 십모형을 ${quotientTens}개씩 나누어주면, 우리가 사용한 십모형은 모두 몇 개일까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientTens * divisor });
+                
+                    scenario.push({ type: 'bot', text: `잘했어! 그럼 남는 십모형은 몇 개일까?` });
+                    scenario.push({ type: 'user', correctType: 'numberOrText', expectedNumber: remainderTens, correctText: ['없어요', '0개'] });
+                } else if (quotientHundreds > 0 && totalTens === 0) {
+                    scenario.push({ type: 'bot', text: `나누어 줄 십모형이 없으니, 몫의 십의 자리는 0이 되겠구나. 이제 일모형을 가지고 나누어 볼까?` });
+                } else {
+                     scenario.push({ type: 'bot', text: `십모형이 없으니, 이제 일모형을 가지고 나누어 볼까?` });
+                }
+
+                const convertedOnes = remainderTens * 10;
+                const totalOnes = convertedOnes + ones;
+                
+                // 남은 십모형을 일모형으로 바꾸는 과정
+                if(remainderTens > 0) {
+                    // 1. 남은 십모형을 일모형으로 바꾸는 질문 추가
+                    scenario.push({ type: 'bot', text: `맞아! 남은 십모형 ${remainderTens}개는 일모형으로 바꿔주자. 십모형 1개는 일모형 10개와 같으니, 십모형 ${remainderTens}개는 일모형 몇 개와 같을까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: convertedOnes });
+                    
+                    // 2. 새로 바꾼 일모형과 원래 일모형을 합치는 질문
+                    scenario.push({ type: 'bot', text: `최고야! 그럼 바꿔준 일모형 ${convertedOnes}개와 원래 있던 일모형 ${ones}개를 합치면, 일모형은 모두 몇 개가 될까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: totalOnes });
+
+                } else if (totalTens > 0 && remainderTens === 0) {
+                    // 십모형이 딱 떨어져서 남은 십모형이 0이고, 원래 십모형이 0이 아니었던 경우 (ex: 400 / 4)
+                    scenario.push({ type: 'bot', text: `남은 십모형은 없으니, 원래 있던 일모형 ${ones}개를 가지고 계속 풀어보자. 일모형은 모두 몇 개일까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: ones });
+                } else if (totalTens === 0) {
+                    // 십모형이 처음부터 0개였던 경우 (ex: 108 / 4, 08 / 4)
+                    scenario.push({ type: 'bot', text: `일모형은 모두 몇 개일까?` });
+                    scenario.push({ type: 'user', correctType: 'number', expectedNumber: totalOnes });
+                }
+                
+                const quotientOnes = Math.floor(totalOnes / divisor);
+                const remainderOnes = totalOnes % divisor;
+
+                scenario.push({ type: 'bot', text: `완벽해! 이제 일모형 ${totalOnes}개를 ${divisor}명에게 똑같이 나누어 주면 한 명당 몇 개씩 가지게 될까?` });
+                scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientOnes });
+                
+                // 사용한 일모형 총 개수 질문 - 엄격한 로직 유지 (몫 x 나누는 수만 정답)
+                scenario.push({ type: 'bot', text: `대단해! 그럼 ${divisor}명에게 일모형을 ${quotientOnes}개씩 나누어주면, 우리가 사용한 일모형은 모두 몇 개일까?` });
+                scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientOnes * divisor });
+
+                scenario.push({ type: 'bot', text: `맞아. 그럼 남는 일모형은 몇 개일까?` });
+                scenario.push({ type: 'user', correctType: 'numberOrText', expectedNumber: remainderOnes, correctText: ['없어요', '0개'] });
+
+                const finalQuotient = parseInt(quotientHundreds.toString() + quotientTens.toString() + quotientOnes.toString());
+                
+                // Final question logic - 모형 개수 리스트 정리
+                let expectedModels = []; 
+                let modelQuestionText = "백모형, 십모형, 일모형을 각각 몇 개씩 받았나요?";
+                
+                if(quotientHundreds > 0) expectedModels.push(quotientHundreds);
+                // 몫이 100의 자리부터 시작할 경우, 십의 자리가 0이어도 포함해야 함 (예: 408/4 -> 102)
+                if(quotientTens > 0 || (quotientHundreds > 0 && totalTens === 0) ) expectedModels.push(quotientTens);
+                if(quotientOnes >= 0) expectedModels.push(quotientOnes); 
+
+                // 몫이 100보다 작은 경우 (e.g. 98/4 -> 24)
+                if (finalQuotient < 100) {
+                    modelQuestionText = "십모형과 일모형을 각각 몇 개씩 받았나요?";
+                    // expectedModels에서 백의 자리 0을 제거
+                    if (expectedModels[0] === 0) expectedModels.shift(); 
+                }
+
+                scenario.push({ type: 'bot', text: `완벽해! 이제 마지막이야. 한 사람이 ${modelQuestionText}` });
+                scenario.push({
+                    type: 'user',
+                    correctType: 'finalModelCount', 
+                    expectedModels: expectedModels,
+                    isFinalQuestion: true
+                });
+
+                scenario.push({ type: 'bot', text: `바로 그거야! 그럼 한 사람이 받은 것은 모두 합쳐서 얼마일까?` });
+                scenario.push({ type: 'user', correctType: 'number', expectedNumber: finalQuotient, isFinalQuestion: true });
+                scenario.push({ type: 'bot', text: `정답이야! 그래서 ${dividend} ÷ ${divisor}의 몫은 ${finalQuotient}이고 나머지는 ${remainderOnes}이 된단다. 너 정말 대단해!` });
+
+                return { dividend, divisor, quotient: finalQuotient, remainder: remainderOnes, steps: scenario };
+            }
+
+            // 두 자리 수 나눗셈 로직
+            const tens = Math.floor(dividend / 10);
+            const ones = dividend % 10;
+            scenario.push({ type: 'bot', text: `안녕! 나는 나눗셈을 도와주는 나눔봇이야. 함께 ${dividend} ÷ ${divisor}를 계산해볼까? 먼저 ${dividend}을 수 모형으로 나타내면 십모형과 일모형이 각각 몇 개씩 필요할까?` });
+            
+            scenario.push({
+                type: 'user',
+                correctType: 'blockCount',
+                expectedTens: tens,
+                expectedOnes: ones
+            });
+
+            scenario.push({ type: 'bot', text: `맞아! 그럼 이 십모형 ${tens}개와 일모형 ${ones}개를 몇 명에게 똑같이 나누어 주어야 할까?` });
+            
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: divisor });
+            scenario.push({ type: 'bot', text: `정확해! 그럼 먼저 십모형 ${tens}개를 ${divisor}명에게 똑같이 나누어 주면 한 명당 몇 개씩 가질 수 있을까?` });
+            
+            let currentTens = tens;
+            const quotientTens = Math.floor(currentTens / divisor);
+            const remainderTens = currentTens % divisor;
+
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientTens });
+
+            // 나누어 준 총 십모형 개수 묻는 단계
+            scenario.push({ type: 'bot', text: `딩동댕! 그럼 ${divisor}명에게 십모형을 ${quotientTens}개씩 나누어주면, 우리가 사용한 십모형은 모두 몇 개일까? ( ${divisor}명 x ${quotientTens}개 )` });
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientTens * divisor });
+
+            const remainderTensQuestion = (remainderTens === 0) ? `아주 잘했어! 남는 십모형이 없네요!` : `아주 잘했어! 그럼 원래 있던 십모형 ${tens}개 중에서 ${quotientTens * divisor}개를 나누어주었으니, 남는 십모형은 몇 개일까?`;
+            scenario.push({ type: 'bot', text: remainderTensQuestion });
+            
+            if (remainderTens > 0) {
+                scenario.push({ type: 'user', correctType: 'number', expectedNumber: remainderTens });
+            }
+
+            const convertedOnes = remainderTens * 10;
+            const totalOnes = convertedOnes + ones;
+            
+            if(remainderTens === 0) {
+                scenario.push({ type: 'bot', text: `남은 십모형은 없으니, 원래 있던 일모형 ${ones}개를 가지고 계속 풀어보자. 일모형은 모두 몇 개일까?` });
+                scenario.push({ type: 'user', correctType: 'number', expectedNumber: ones });
+            } else { // remainderTens > 0 인 경우
+                // 1. 남은 십모형을 일모형으로 바꾸는 질문 추가
+                scenario.push({ type: 'bot', text: `맞아! 남은 십모형 ${remainderTens}개는 일모형으로 바꿔주자. 십모형 1개는 일모형 10개와 같으니, 십모형 ${remainderTens}개는 일모형 몇 개와 같을까?` });
+                scenario.push({ type: 'user', correctType: 'number', expectedNumber: convertedOnes });
+                
+                // 2. 새로 바꾼 일모형과 원래 일모형을 합치는 질문
+                scenario.push({ type: 'bot', text: `최고야! 그럼 바꿔준 일모형 ${convertedOnes}개와 원래 있던 일모형 ${ones}개를 합치면, 일모형은 모두 몇 개가 될까?` });
+                scenario.push({ type: 'user', correctType: 'number', expectedNumber: totalOnes });
+            }
+            
+            const quotientOnes = Math.floor(totalOnes / divisor);
+            const remainderOnes = totalOnes % divisor;
+            
+            scenario.push({ type: 'bot', text: `완벽해! 이제 일모형 ${totalOnes}개를 ${divisor}명에게 똑같이 나누어 주면 한 명당 몇 개씩 가지게 될까?` });
+
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientOnes });
+            scenario.push({ type: 'bot', text: `대단해! 그럼 ${divisor}명에게 일모형을 ${quotientOnes}개씩 나누어주면, 우리가 사용한 일모형은 모두 몇 개일까?` });
+            
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientOnes * divisor });
+            scenario.push({ type: 'bot', text: `맞아. 그럼 남는 일모형은 몇 개일까?` });
+            
+            scenario.push({ type: 'user', correctType: 'numberOrText', expectedNumber: remainderOnes, correctText: ['없어요', '0개'] });
+            
+            const finalQuotient = parseInt(quotientTens.toString() + quotientOnes.toString());
+            
+            // 최종 질문 문구 수정
+            scenario.push({ type: 'bot', text: `완벽해! 이제 마지막이야. 한 사람이 십모형과 일모형을 각각 몇 개씩 받았나요?` });
+            scenario.push({
+                type: 'user',
+                correctType: 'finalModelCount', 
+                expectedModels: [quotientTens, quotientOnes],
+                isFinalQuestion: true
+            });
+            scenario.push({ type: 'bot', text: `바로 그거야! 그럼 한 사람이 받은 것은 모두 합쳐서 얼마일까?` });
+            
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: finalQuotient, isFinalQuestion: true });
+            scenario.push({ type: 'bot', text: `정답이야! 그래서 ${dividend} ÷ ${divisor}의 몫은 ${finalQuotient}이고 나머지는 ${remainderOnes}이 된단다. 너 정말 대단해!` });
+
+            return { dividend, divisor, quotient: finalQuotient, remainder: remainderOnes, steps: scenario };
+        }
+
+        async function initApp() {
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        // 사용자 ID를 짧게 표시
+                        userIdDisplay.textContent = `사용자 ID: ${userId.substring(0, 8)}...`;
+                        await loadChatState();
+                        showStartScreen();
+                    } else {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase 초기화 중 오류 발생:", error);
+                const errorMessage = document.createElement('div');
+                errorMessage.textContent = 'Firebase 초기화에 실패했습니다. 콘솔을 확인해주세요.';
+                errorMessage.className = 'text-red-500 p-4 text-center';
+                messagesContainer.appendChild(errorMessage);
+            }
+        }
+
+        async function saveChatState() {
+            if (!userId) return;
+            // Firestore에 상태 저장 (Private Data)
+            const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/chatState/state`);
+            try {
+                await setDoc(userDocRef, {
+                    currentProblem: currentProblem,
+                    step: step,
+                    messages: messagesContainer.innerHTML
+                });
+            } catch (error) {
+                console.error("상태 저장 실패:", error);
+            }
+        }
+
+        async function loadChatState() {
+            if (!userId) return;
+            // Firestore에서 상태 불러오기
+            const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/chatState/state`);
+            try {
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    currentProblem = data.currentProblem;
+                    step = data.step;
+                    messagesContainer.innerHTML = data.messages;
+                    scrollToBottom();
+                    if (currentProblem && step < currentProblem.steps.length) {
+                        sendNextMessage();
+                    } else {
+                        showStartScreen();
+                    }
+                } else {
+                    addBotMessage('안녕하세요! 나눗셈 챗봇, 나눔봇이에요. 함께 재미있는 나눗셈 공부를 시작해볼까요?');
+                    showStartScreen();
+                }
+            } catch (error) {
+                console.error("상태 불러오기 실패:", error);
+                addBotMessage('이전 학습 기록을 불러오는 데 실패했어요. 새로운 학습을 시작해볼까요?');
+                showStartScreen();
+            }
+        }
+
+        function addBotMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message bot-message';
+            msgDiv.innerHTML = text;
+            messagesContainer.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function addUserMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message user-message';
+            msgDiv.textContent = text;
+            messagesContainer.appendChild(msgDiv);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function enableInput() {
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            userInput.focus();
+        }
+
+        function disableInput() {
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+        }
+
+        function showStartScreen() {
+            inputContainer.classList.add('hidden');
+            startButtonContainer.classList.remove('hidden');
+            numberInputStart.classList.remove('hidden');
+        }
+
+        function hideStartScreen() {
+            inputContainer.classList.remove('hidden');
+            startButtonContainer.classList.add('hidden');
+            numberInputStart.classList.add('hidden');
+        }
+
+        function startProblem(problem) {
+            messagesContainer.innerHTML = '';
+            currentProblem = problem;
+            step = 0;
+            hideStartScreen();
+            sendNextMessage();
+        }
+
+        function sendNextMessage() {
+            while (currentProblem && step < currentProblem.steps.length) {
+                const currentStep = currentProblem.steps[step];
+                if (currentStep.type === 'bot') {
+                    addBotMessage(currentStep.text);
+                    step++;
+                } else {
+                    // 사용자 입력 단계에서는 힌트 버튼을 보여줍니다.
+                    addHintButton();
+                    enableInput();
+                    saveChatState();
+                    return;
+                }
+            }
+            // 모든 단계 완료 후 최종 코멘트 요청
+            if (currentProblem) {
+                generateFinalComment(currentProblem.dividend, currentProblem.divisor, currentProblem.quotient, currentProblem.remainder);
+            }
+            addBotMessage('모든 문제를 다 풀었어요! 새로운 문제를 시작해볼까요?');
+            showStartScreen();
+            saveChatState();
+        }
+
+        function addHintButton() {
+            // 이미 힌트 버튼이 있는지 확인하고 있다면 추가하지 않음
+            if (document.getElementById('llmHintButton')) return; 
+
+            const btn = document.createElement('button');
+            btn.id = 'llmHintButton';
+            btn.className = 'llm-hint-button';
+            btn.textContent = '✨ 나눔봇 팁 받기 (도움말)';
+            btn.onclick = () => {
+                if (!currentProblem || step >= currentProblem.steps.length) return;
+                const currentStep = currentProblem.steps[step];
+                generateHint(currentProblem, currentStep);
+            };
+
+            const lastMessage = messagesContainer.lastElementChild;
+            // 마지막 메시지가 봇 메시지인 경우에만 힌트 버튼을 추가합니다.
+            if (lastMessage && lastMessage.classList.contains('bot-message')) {
+                lastMessage.appendChild(btn);
+            }
+        }
+        
+        function removeHintButton() {
+            const btn = document.getElementById('llmHintButton');
+            if (btn) btn.remove();
+        }
+
+
+        function checkAnswer(answer) {
+            if (!currentProblem || step >= currentProblem.steps.length) {
+                return;
+            }
+            
+            const currentStep = currentProblem.steps[step];
+            // 봇 전용 단계 건너뛰기
+            if (currentStep.type === 'bot') {
+              step++;
+              sendNextMessage();
+              return;
+            }
+
+            let isCorrect = false;
+            const normalizedAnswer = answer.toLowerCase().trim();
+            // 숫자만 추출 (예: '10개' -> 10)
+            const numbers = normalizedAnswer.match(/\d+/g);
+
+            if (currentStep.correctType === 'blockCount') {
+                // 십모형/백모형/일모형 개수 확인 로직 (초기)
+                if (numbers) {
+                    let expected;
+                    let correctCount = 0;
+                    let totalExpected = 0;
+
+                    if (currentStep.expectedHundreds !== undefined) {
+                        expected = [currentStep.expectedHundreds, currentStep.expectedTens, currentStep.expectedOnes];
+                        totalExpected = 3;
+                    } else if (currentStep.expectedTens !== undefined) {
+                        expected = [currentStep.expectedTens, currentStep.expectedOnes];
+                        totalExpected = 2;
+                    }
+
+                    if (numbers.length >= totalExpected) {
+                        // 입력된 숫자의 순서대로 기대값과 비교
+                        for (let i = 0; i < totalExpected; i++) {
+                            if (parseInt(numbers[i]) === expected[i]) {
+                                correctCount++;
+                            }
+                        }
+                    }
+                    isCorrect = correctCount === totalExpected;
+                }
+            } else if (currentStep.correctType === 'finalModelCount') {
+                // 최종 몫을 모형 개수로 확인하는 로직 (배열 비교)
+                if (numbers) {
+                    const userModels = numbers.map(n => parseInt(n));
+                    const expectedModels = currentStep.expectedModels;
+
+                    // 순서와 개수가 일치하는지 확인
+                    if (userModels.length === expectedModels.length) {
+                        isCorrect = userModels.every((val, index) => val === expectedModels[index]);
+                    }
+                }
+            } else if (currentStep.correctType === 'number') {
+                // 단순 숫자 확인 (몫, 사용한 총 개수, 변환 개수 등)
+                if (numbers && numbers.length > 0) {
+                    const numberAnswer = parseInt(numbers[0]);
+                    isCorrect = numberAnswer === currentStep.expectedNumber;
+                }
+            } else if (currentStep.correctType === 'numberOrText') {
+                // 숫자 또는 특정 텍스트 확인 (ex: 나머지 0개 또는 없어요)
+                if (numbers && numbers.length > 0) {
+                    const numberAnswer = parseInt(numbers[0]);
+                    if (numberAnswer === currentStep.expectedNumber) {
+                        isCorrect = true;
+                    }
+                } else if (currentStep.correctText && currentStep.correctText.includes(normalizedAnswer)) {
+                    isCorrect = true;
+                }
+            } 
+            // 다른 타입의 정답 검사는 생략 (필요한 타입만 구현)
+
+            if (isCorrect) {
+                removeHintButton(); // 정답을 맞히면 힌트 버튼 제거
+                addUserMessage(answer);
+                step++;
+                disableInput();
+                setTimeout(() => {
+                    sendNextMessage();
+                }, 1000);
+            } else {
+                addBotMessage('다시 한 번 생각해볼까요?');
+                addHintButton(); // 틀렸을 때 힌트 버튼 다시 표시
+            }
+        }
+
+        sendBtn.addEventListener('click', () => {
+            const answer = userInput.value;
+            if (answer) {
+                checkAnswer(answer);
+                userInput.value = '';
+            }
+        });
+
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        });
+
+        startButton.addEventListener('click', () => {
+            // 두 자리 수 문제 (10~99) / (2~9)
+            const randomDividend = Math.floor(Math.random() * 90) + 10;
+            const randomDivisor = Math.floor(Math.random() * 8) + 2;
+            addBotMessage(`${randomDividend} ÷ ${randomDivisor} 문제를 시작할게요!`);
+            startProblem(createScenario(randomDividend, randomDivisor));
+        });
+
+        problemStartBtn.addEventListener('click', () => {
+            const dividend = parseInt(dividendInput.value);
+            const divisor = parseInt(divisorInput.value);
+
+            if (!isNaN(dividend) && !isNaN(divisor) && divisor !== 0) {
+                // 문제 범위 제한 (10~999 / 2~9)
+                if (dividend >= 10 && dividend <= 999 && divisor >= 2 && divisor <= 9) {
+                    addBotMessage(`${dividend} ÷ ${divisor} 문제를 시작할게요!`);
+                    startProblem(createScenario(dividend, divisor));
+                } else {
+                     addBotMessage('나누어질 수는 10부터 999 사이, 나누는 수는 2부터 9 사이의 자연수를 입력해주세요.');
+                }
+            } else {
+                addBotMessage('나누어질 수와 나누는 수를 올바르게 입력해주세요.');
+            }
+        });
+
+        initApp();
+    </script>
+</body>
+</html>
