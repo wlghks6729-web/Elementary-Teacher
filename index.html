@@ -168,7 +168,7 @@
         <div class="chat-container">
             <div class="header">
                 <span class="header-title">나눗셈 챗봇</span>
-                <span id="userIdDisplay" class="header-user-id">사용자 ID: 로딩 중...</span>
+                <span id="userIdDisplay" class="header-user-id">상태: 로딩 중...</span>
             </div>
             <div id="messages" class="messages">
                 <!-- Chat messages will be dynamically added here -->
@@ -214,6 +214,7 @@
         let currentProblem = null;
         let step = 0;
         let isLlmGenerating = false; // LLM 요청 중복 방지 플래그
+        let isFirebaseReady = false; // Firebase 초기화 성공 여부 플래그
 
         const messagesContainer = document.getElementById('messages');
         const userInput = document.getElementById('userInput');
@@ -271,13 +272,10 @@
 
             const problem = `${currentProblem.dividend} ÷ ${currentProblem.divisor}`;
             const question = currentProblem.steps[step - 1].text; 
-            // 현재 단계의 예상 정답 추출 (expectedNumber, expectedTens 등)
             const expectedAnswer = currentStep.expectedNumber || currentStep.expectedTens || currentStep.expectedHundreds || currentStep.expectedModels.join(', ');
             
-            // 시스템 프롬프트: 튜터의 역할과 톤 정의
             const systemPrompt = `당신은 초등학생에게 나눗셈을 가르치는 친절하고 격려하는 수학 튜터(나눔봇)입니다. 학생이 틀린 문제의 단계를 보고, 정답을 직접 알려주지 않고, 다음 질문에 대한 답을 찾는 데 도움이 될 수 있는 구체적인 힌트를 한 문장으로 제공하세요. 힌트는 수 모형(백모형, 십모형, 일모형)의 개념을 사용하여 설명해야 합니다. 답변은 반드시 한국어로 작성하세요.`;
 
-            // 사용자 쿼리: LLM에게 요청하는 구체적인 작업
             const userQuery = `현재 문제: ${problem}. 바로 이전 챗봇의 질문: "${question}". 이 질문의 정답은 ${expectedAnswer}입니다. 학생이 정답을 맞히지 못했으므로, 이 정답을 유추할 수 있는 1개의 구체적인 힌트 문장을 생성해 주세요.`;
 
             const payload = {
@@ -578,9 +576,10 @@
         async function initApp() {
             // Firebase Config 유효성 검사: 구성 정보가 없으면 초기화 중단
             if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
-                console.error("Firebase Configuration is missing. Cannot initialize Firebase.");
-                userIdDisplay.textContent = '오류 발생';
-                addBotMessage('🚨 **오류 발생:** 학습 기록 저장소 설정이 누락되었습니다. (페이지를 새로고침해보거나 다시 시도해주세요.)');
+                console.error("Firebase Configuration is missing. Cannot initialize Firebase. Using local state.");
+                userIdDisplay.textContent = '상태: 기록 저장 불가 (시스템 오류)';
+                addBotMessage('🚨 **시스템 오류:** 학습 기록 저장소 연결에 실패했습니다. 하지만 걱정 마세요! 챗봇은 정상적으로 사용 가능합니다.');
+                isFirebaseReady = false;
                 showStartScreen();
                 return; 
             }
@@ -589,6 +588,7 @@
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                isFirebaseReady = true;
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
@@ -607,14 +607,16 @@
                 });
             } catch (error) {
                 console.error("Firebase 초기화 중 오류 발생:", error);
-                userIdDisplay.textContent = '오류 발생';
-                addBotMessage('🚨 **오류 발생:** Firebase 초기화에 실패했습니다. 학습 기록 저장이 불가능합니다. (콘솔 확인)');
-                showStartScreen();
+                userIdDisplay.textContent = '상태: 기록 저장 불가 (초기화 오류)';
+                addBotMessage('🚨 **초기화 실패:** Firebase 초기화에 실패했습니다. 학습 기록 저장이 불가능합니다. 챗봇은 사용 가능합니다.');
+                isFirebaseReady = false;
+                // 초기화 실패 시에도 챗봇 사용은 가능하도록 시작 화면 표시
+                showStartScreen(); 
             }
         }
 
         async function saveChatState() {
-            if (!userId) return;
+            if (!isFirebaseReady || !userId) return;
             // Firestore에 상태 저장 (Private Data)
             const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/chatState/state`);
             try {
@@ -629,7 +631,11 @@
         }
 
         async function loadChatState() {
-            if (!userId) return;
+            if (!isFirebaseReady || !userId) {
+                // Firebase가 준비되지 않았거나 사용자 ID가 없는 경우 새 채팅 시작
+                addBotMessage('안녕하세요! 나눗셈 챗봇, 나눔봇이에요. 함께 재미있는 나눗셈 공부를 시작해볼까요?');
+                return;
+            }
             // Firestore에서 상태 불러오기
             const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/chatState/state`);
             try {
@@ -647,12 +653,10 @@
                     }
                 } else {
                     addBotMessage('안녕하세요! 나눗셈 챗봇, 나눔봇이에요. 함께 재미있는 나눗셈 공부를 시작해볼까요?');
-                    showStartScreen();
                 }
             } catch (error) {
                 console.error("상태 불러오기 실패:", error);
                 addBotMessage('이전 학습 기록을 불러오는 데 실패했어요. 새로운 학습을 시작해볼까요?');
-                showStartScreen();
             }
         }
 
@@ -717,7 +721,7 @@
                     // 사용자 입력 단계에서는 힌트 버튼을 보여줍니다.
                     addHintButton();
                     enableInput();
-                    saveChatState();
+                    saveChatState(); // Firebase ready일 때만 저장 시도
                     return;
                 }
             }
@@ -727,7 +731,7 @@
             }
             addBotMessage('모든 문제를 다 풀었어요! 새로운 문제를 시작해볼까요?');
             showStartScreen();
-            saveChatState();
+            saveChatState(); // Firebase ready일 때만 저장 시도
         }
 
         function addHintButton() {
