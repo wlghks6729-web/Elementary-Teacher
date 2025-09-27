@@ -576,6 +576,15 @@
         }
 
         async function initApp() {
+            // Firebase Config 유효성 검사: 구성 정보가 없으면 초기화 중단
+            if (!firebaseConfig || Object.keys(firebaseConfig).length === 0) {
+                console.error("Firebase Configuration is missing. Cannot initialize Firebase.");
+                userIdDisplay.textContent = '오류 발생';
+                addBotMessage('🚨 **오류 발생:** 학습 기록 저장소 설정이 누락되었습니다. (페이지를 새로고침해보거나 다시 시도해주세요.)');
+                showStartScreen();
+                return; 
+            }
+
             try {
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -598,10 +607,9 @@
                 });
             } catch (error) {
                 console.error("Firebase 초기화 중 오류 발생:", error);
-                const errorMessage = document.createElement('div');
-                errorMessage.textContent = 'Firebase 초기화에 실패했습니다. 콘솔을 확인해주세요.';
-                errorMessage.className = 'text-red-500 p-4 text-center';
-                messagesContainer.appendChild(errorMessage);
+                userIdDisplay.textContent = '오류 발생';
+                addBotMessage('🚨 **오류 발생:** Firebase 초기화에 실패했습니다. 학습 기록 저장이 불가능합니다. (콘솔 확인)');
+                showStartScreen();
             }
         }
 
