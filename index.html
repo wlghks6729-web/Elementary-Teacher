@@ -118,6 +118,15 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        /* Hide number input arrows */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -148,20 +157,38 @@
                     </div>
                 </div>
                 <div id="start-screen" class="text-center">
-                    <img src="https://placehold.co/150x150/e0f2fe/0c4a6e?text=%ED%99%94%EB%8B%88%EC%8C%A4" alt="화니쌤" class="mx-auto rounded-full mb-4">
-                    <div id="problem-input-area" class="flex flex-col gap-2 w-full">
+                    <img src="https://placehold.co/150x150/e0f2fe/0c4a6e?text=%C3%B7" alt="나눗셈 기호" class="mx-auto rounded-full mb-4">
+                    <div id="problem-input-area" class="flex flex-col gap-4 w-full">
                         <p class="text-slate-700 text-lg">어떤 나눗셈을 풀어볼까요?</p>
-                        <div class="flex gap-2 justify-center items-center">
-                            <input type="number" id="dividendInput" placeholder="나누어질 수" class="w-28 p-2 border rounded-md text-center">
-                            <span class="text-xl font-bold">/</span>
-                            <input type="number" id="divisorInput" placeholder="나누는 수" class="w-28 p-2 border rounded-md text-center">
+                        <div class="flex gap-4 justify-center items-start">
+                            <!-- Dividend Input -->
+                            <div class="flex flex-col items-center">
+                                <label for="dividendInput" class="text-slate-600 mb-1">나누어질 수</label>
+                                <div class="flex items-center">
+                                    <button id="dividend-decrement" class="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-bold p-2 rounded-l-md w-10">-</button>
+                                    <input type="number" id="dividendInput" class="w-24 p-2 border-t border-b text-center focus:outline-none" min="0">
+                                    <button id="dividend-increment" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold p-2 rounded-r-md w-10">+</button>
+                                </div>
+                            </div>
+                            <span class="text-2xl font-bold pt-8">÷</span>
+                            <!-- Divisor Input -->
+                            <div class="flex flex-col items-center">
+                                <label for="divisorInput" class="text-slate-600 mb-1">나누는 수</label>
+                                <div class="flex items-center">
+                                    <button id="divisor-decrement" class="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-bold p-2 rounded-l-md w-10">-</button>
+                                    <input type="number" id="divisorInput" class="w-24 p-2 border-t border-b text-center focus:outline-none" min="0">
+                                    <button id="divisor-increment" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold p-2 rounded-r-md w-10">+</button>
+                                </div>
+                            </div>
                         </div>
-                        <button id="problemStartBtn" class="bg-blue-500 text-white font-bold py-2 rounded-lg hover:bg-blue-600 mt-2">직접 문제내기</button>
-                        <button id="randomStartButton" class="bg-green-500 text-white font-bold py-2 rounded-lg hover:bg-green-600 mt-2">랜덤 문제 시작!</button>
+                        <div class="flex flex-col gap-2 mt-2">
+                             <button id="problemStartBtn" class="bg-blue-500 text-white font-bold py-2 rounded-lg hover:bg-blue-600">직접 문제내기</button>
+                             <button id="randomStartButton" class="bg-green-500 text-white font-bold py-2 rounded-lg hover:bg-green-600">랜덤 문제 시작!</button>
+                        </div>
                     </div>
-                    <div id="completion-area" class="hidden">
-                        <button id="resetButton" class="bg-gray-700 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-800 mt-4">처음으로</button>
-                    </div>
+                </div>
+                <div id="completion-area" class="hidden">
+                    <button id="resetButton" class="bg-gray-700 text-white font-bold py-2 px-6 rounded-lg hover:bg-gray-800 mt-4">처음으로</button>
                 </div>
             </div>
         </div>
@@ -206,6 +233,12 @@
         const dividendInput = document.getElementById('dividendInput');
         const divisorInput = document.getElementById('divisorInput');
         const userIdDisplay = document.getElementById('userIdDisplay');
+        
+        const dividendDecrement = document.getElementById('dividend-decrement');
+        const dividendIncrement = document.getElementById('dividend-increment');
+        const divisorDecrement = document.getElementById('divisor-decrement');
+        const divisorIncrement = document.getElementById('divisor-increment');
+
 
         const apiKey = "";
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
@@ -275,6 +308,8 @@
         function createScenario(dividend, divisor) {
             const scenario = [];
             const dividendStr = String(dividend);
+            const finalQuotient = Math.floor(dividend / divisor);
+            const finalRemainder = dividend % divisor;
 
             if (dividend >= 100) {
                 const hundreds = Math.floor(dividend / 100);
@@ -336,7 +371,7 @@
                 if (remainderTens > 0) {
                      scenario.push({ type: 'bot', text: `남은 십모형 ${remainderTens}개는 일모형 ${remainderTens*10}개로 바꿀 수 있어. 원래 있던 ${ones}개와 합치면 일모형은 모두 몇 개일까?` });
                      scenario.push({ type: 'user', correctType: 'number', expectedNumber: totalOnes, visual: { type: 'bring_down', value: ones, index: 2 }});
-                } else { // Handles cases like 809/8, 859/8
+                } else { 
                      scenario.push({ type: 'bot', text: `남은 십모형이 없네! 그럼 원래 있던 일모형은 몇 개인가요?`});
                      scenario.push({ type: 'user', correctType: 'number', expectedNumber: ones, visual: { type: 'bring_down', value: ones, index: 2 }});
                 }
@@ -364,7 +399,7 @@
                 scenario.push({ type: 'bot', text: `먼저 십모형 ${tens}개를 ${divisor}명에게 똑같이 나누어 주면 한 명당 몇 개씩 가질 수 있을까?` });
                 scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientTens, visual: { type: 'quotient', value: quotientTens, index: 0 } });
 
-                if (quotientTens >= 0) { // Always show subtraction for 0 as well
+                if (quotientTens >= 0) {
                     scenario.push({ type: 'bot', text: `딩동댕! 그럼 ${divisor}명에게 십모형을 ${quotientTens}개씩 나누어주면, 사용한 십모형은 모두 몇 개일까? (${divisor} × ${quotientTens})` });
                     scenario.push({ type: 'user', correctType: 'number', expectedNumber: quotientTens * divisor, visual: { type: 'subtraction', value: quotientTens * divisor, index: 0 } });
                 }
@@ -394,10 +429,11 @@
                 scenario.push({ type: 'bot', text: `맞아. 그럼 남는 일모형은 몇 개일까?` });
                 scenario.push({ type: 'user', correctType: 'number', expectedNumber: remainderOnes, visual: { type: 'remainder', value: remainderOnes, index: 1, isFinal: true } });
             }
-
-            const finalQuotient = Math.floor(dividend / divisor);
-            const finalRemainder = dividend % divisor;
-            scenario.push({ type: 'bot', text: `완벽해! 그래서 ${dividend} ÷ ${divisor}의 몫은 ${finalQuotient}이고 나머지는 ${finalRemainder}이 된단다. 정말 대단해!` });
+            
+            scenario.push({ type: 'bot', text: '좋아요, 이제 나눗셈 결과를 정리해봅시다. 몫은 얼마인가요?' });
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: finalQuotient });
+            scenario.push({ type: 'bot', text: '훌륭해요. 나머지는 얼마인가요?' });
+            scenario.push({ type: 'user', correctType: 'number', expectedNumber: finalRemainder });
 
             return { dividend, divisor, quotient: finalQuotient, remainder: finalRemainder, steps: scenario };
         }
@@ -445,12 +481,14 @@
             if (type === 'quotient') {
                 const finalQuotientStr = String(currentProblem.quotient);
                 let quotientPadding = visualState.dividendStr.length - finalQuotientStr.length;
-
-                // Handle cases like 187/2 where quotient is 93 (2 digits) but dividend is 3 digits.
-                // The first quotient is 0 for the hundreds place.
-                if (parseInt(visualState.dividendStr[0]) < currentProblem.divisor && visualState.dividendStr.length > finalQuotientStr.length) {
+                
+                let currentDivisor = parseInt(visualState.dividendStr.substring(0, index + 1));
+                if(index === 0 && value === 0){
+                    quotientPadding = 0;
+                } else if(finalQuotientStr.length < visualState.dividendStr.length && parseInt(visualState.dividendStr[0]) < currentProblem.divisor) {
                     quotientPadding = 0;
                 }
+
 
                 const quotientCell = document.getElementById(`q-cell-${index + quotientPadding}`);
                 if (quotientCell) {
@@ -624,13 +662,14 @@
             problemInputArea.classList.remove('hidden');
             dividendInput.value = '';
             divisorInput.value = '';
+            updateDecrementButtons();
         }
         function showCompletionScreen() {
             disableInput();
-            problemInputArea.classList.add('hidden');
             completionArea.classList.remove('hidden');
         }
         function startProblem(problem, resetChat = true, isContinuing = false) {
+            completionArea.classList.add('hidden');
             if(!isContinuing) {
                  if(resetChat) chatWindow.innerHTML = '';
                  step = 0;
@@ -718,7 +757,11 @@
                 }
                 step++;
                 disableInput();
-                setTimeout(sendNextMessage, 1000);
+                if (step >= currentProblem.steps.length) {
+                    sendNextMessage(); // 마지막 단계 후 즉시 피드백
+                } else {
+                    setTimeout(sendNextMessage, 1000); // 중간 단계는 딜레이 유지
+                }
             } else {
                 addBotMessage('음... 다시 한 번 생각해볼까요?');
             }
@@ -750,6 +793,43 @@
         });
         
         resetButton.addEventListener('click', showStartScreen);
+
+        function updateDecrementButtons() {
+            const dividendValue = parseInt(dividendInput.value) || 0;
+            const divisorValue = parseInt(divisorInput.value) || 0;
+            dividendDecrement.disabled = dividendValue <= 0;
+            divisorDecrement.disabled = divisorValue <= 0;
+        }
+
+        dividendIncrement.addEventListener('click', () => {
+            dividendInput.value = (parseInt(dividendInput.value) || 0) + 1;
+            updateDecrementButtons();
+        });
+
+        dividendDecrement.addEventListener('click', () => {
+            const value = (parseInt(dividendInput.value) || 0);
+            if (value > 0) {
+                dividendInput.value = value - 1;
+            }
+            updateDecrementButtons();
+        });
+
+        divisorIncrement.addEventListener('click', () => {
+            divisorInput.value = (parseInt(divisorInput.value) || 0) + 1;
+            updateDecrementButtons();
+        });
+
+        divisorDecrement.addEventListener('click', () => {
+            const value = (parseInt(divisorInput.value) || 0);
+            if (value > 0) {
+                divisorInput.value = value - 1;
+            }
+            updateDecrementButtons();
+        });
+
+        dividendInput.addEventListener('input', updateDecrementButtons);
+        divisorInput.addEventListener('input', updateDecrementButtons);
+        
         initApp();
     </script>
 </body>
